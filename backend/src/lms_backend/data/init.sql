@@ -2,6 +2,14 @@
 -- This script runs automatically on the first start of the PostgreSQL container.
 -- Tables start empty — all data is populated via the ETL pipeline.
 
+-- User: registered users for flashcard application
+CREATE TABLE IF NOT EXISTS "user" (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    hashed_password VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Item: learning materials organized as a tree (labs → tasks).
 -- The tree structure uses the adjacency list pattern (parent_id).
 -- Type-specific attributes are stored in a JSONB column.
@@ -39,6 +47,7 @@ CREATE TABLE IF NOT EXISTS interacts (
 -- Flashcards: Deck of flashcards
 CREATE TABLE IF NOT EXISTS deck (
     id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES "user"(id),
     name VARCHAR(255) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

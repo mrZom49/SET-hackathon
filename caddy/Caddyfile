@@ -21,6 +21,9 @@
     handle /flashcards* {
         reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
     }
+    handle /auth* {
+        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+    }
     handle /learners* {
         reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
     }
@@ -34,9 +37,9 @@
         reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
     }
     # Task 2A — uncomment once the nanobot service is running behind Caddy.
-    handle /ws/chat {
-        reverse_proxy http://nanobot:{$NANOBOT_WEBCHAT_CONTAINER_PORT}
-    }
+    # handle /ws/chat {
+    #     reverse_proxy http://nanobot:{$NANOBOT_WEBCHAT_CONTAINER_PORT}
+    # }
     handle /utils/pgadmin* {
         reverse_proxy http://pgadmin:{$CONST_PGADMIN_CONTAINER_PORT}
     }

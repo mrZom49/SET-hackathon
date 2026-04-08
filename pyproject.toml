@@ -1,22 +1,13 @@
 [tool.uv.workspace]
 members = [
   "backend",
-  "qwen-code-api",
   "mcp/mcp-lms",
   "mcp/mcp-obs",
-  "nanobot",
-  # Uncomment these later in the lab after you add the matching repos/packages.
-  # "nanobot-websocket-channel/nanobot-channel-protocol",
-  "nanobot-websocket-channel/mcp-webchat",
-  "nanobot-websocket-channel/nanobot-webchat",
-  # "nanobot-websocket-channel/client-telegram-bot",
 ]
 
 [tool.uv.sources]
 mcp-lms = { path = "mcp/mcp-lms", editable = true }
 mcp-obs = { path = "mcp/mcp-obs", editable = true }
-
-# Uncomment these later in the lab after you add the matching repos/packages.
 
 # mcp-webchat = { path = "nanobot-websocket-channel/mcp-webchat", editable = true }
 # nanobot-channel-protocol = { path = "nanobot-websocket-channel/nanobot-channel-protocol", editable = true }
@@ -34,7 +25,6 @@ dev = [
 ]
 
 [tool.ruff]
-exclude = ["qwen-code-api"]
 
 [tool.ruff.lint]
 select = ["RET503"]
@@ -117,28 +107,16 @@ help = "Check that openapi.json is up to date"
 cmd = "python scripts/export-openapi.py --check"
 env = { PYTHONPATH = "backend/src" }
 
-# Query Qwen Code API
-
-[tool.poe.tasks.query-qwen-code-api]
-help = "Query the Qwen Code API: poe query-qwen-code-api [OPTIONS] <prompt>"
-cmd = "python scripts/query-qwen-code-api.py"
-
 [tool.pyright]
 include = [
   "backend",
   "scripts",
   "mcp",
-  "qwen-code-api",
-  "nanobot-websocket-channel"
 ]
 extraPaths = [
   "backend/src",
   "mcp/mcp-lms/src",
   "mcp/mcp-obs/src",
-  "qwen-code-api/src",
-  "nanobot-websocket-channel/mcp-webchat/src",
-  "nanobot-websocket-channel/nanobot-channel-protocol/src",
-  "nanobot-websocket-channel/nanobot-webchat/src",
 ]
 exclude = ["**/__pycache__", "**/node_modules", "**/.*", ".venv", ".direnv"]
 typeCheckingMode = "strict"
@@ -156,8 +134,6 @@ asyncio_mode = "auto"
 include = [
   "backend",
   "mcp",
-  "qwen-code-api",
-  "nanobot-websocket-channel"
 ]
 
 [tool.ty.rules]

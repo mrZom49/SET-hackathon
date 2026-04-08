@@ -1,5 +1,0 @@
-__pycache__/
-*.egg-info/
-.dart_tool/
-.flutter-plugins-dependencies
-build/

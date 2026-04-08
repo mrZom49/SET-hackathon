@@ -14,6 +14,7 @@ from starlette.responses import Response
 from lms_backend.auth import verify_api_key
 from lms_backend.routers import (
     analytics,
+    auth,
     flashcards,
     interactions,
     items,
@@ -110,6 +111,13 @@ app.include_router(
     flashcards.router,
     prefix="/flashcards",
     tags=["flashcards"],
+    dependencies=[Depends(verify_api_key)],
+)
+
+app.include_router(
+    auth.router,
+    prefix="/auth",
+    tags=["auth"],
 )
 
 if settings.enable_interactions:

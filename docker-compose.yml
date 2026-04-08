@@ -32,6 +32,7 @@ services:
       - DB_NAME=${POSTGRES_DB:?'POSTGRES_DB is required'}
       - DB_USER=${POSTGRES_USER:?'POSTGRES_USER is required'}
       - DB_PASSWORD=${POSTGRES_PASSWORD:?'POSTGRES_PASSWORD is required'}
+      - JWT_SECRET=${JWT_SECRET:?'JWT_SECRET is required'}
       - OTEL_SERVICE_NAME=${BACKEND_NAME:?'BACKEND_NAME is required'}
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
@@ -92,68 +93,6 @@ services:
     volumes:
       - client-web-react:/output
 
-  # Task 2A — uncomment and adapt this service after you create repo-local nanobot/.
-  nanobot:
-    build:
-      context: ./nanobot
-      additional_contexts:
-        workspace: .
-        webchat: .
-        mcp: .
-        nanobot: .
-      args:
-        REGISTRY_PREFIX_DOCKER_HUB: ${REGISTRY_PREFIX_DOCKER_HUB:-}
-        APP_UID: ${HOST_UID:-1000}
-        APP_GID: ${HOST_GID:-1000}
-    restart: unless-stopped
-    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
-    networks:
-      - lms-network
-    volumes:
-      # Mount only the parts nanobot needs to edit or read from the repo.
-      - ./nanobot:/app/nanobot
-      - ./mcp:/app/mcp
-      - ./nanobot-websocket-channel:/app/nanobot-websocket-channel
-      - ./wiki:/app/wiki:ro
-      - ./lab:/app/lab:ro
-      - ./contributing:/app/contributing:ro
-    environment:
-      # Task 1 used VM-shell URLs. In Docker, use service-to-service URLs instead.
-      - LLM_API_KEY=${LLM_API_KEY:?'LLM_API_KEY is required'}
-      - LLM_API_BASE_URL=http://qwen-code-api:${QWEN_CODE_API_CONTAINER_PORT:?'QWEN_CODE_API_CONTAINER_PORT is required'}/v1
-      - LLM_API_MODEL=${LLM_API_MODEL:?'LLM_API_MODEL is required'}
-      - NANOBOT_LMS_BACKEND_URL=http://backend:${BACKEND_CONTAINER_PORT:?'BACKEND_CONTAINER_PORT is required'}
-      - NANOBOT_LMS_API_KEY=${LMS_API_KEY:?'LMS_API_KEY is required'}
-      - NANOBOT_VICTORIALOGS_URL=http://victorialogs:${CONST_VICTORIALOGS_CONTAINER_PORT:?'CONST_VICTORIALOGS_CONTAINER_PORT is required'}
-      - NANOBOT_VICTORIATRACES_URL=http://victoriatraces:${CONST_VICTORIATRACES_CONTAINER_PORT:?'CONST_VICTORIATRACES_CONTAINER_PORT is required'}
-      - NANOBOT_GATEWAY_CONTAINER_ADDRESS=${NANOBOT_GATEWAY_CONTAINER_ADDRESS:?'NANOBOT_GATEWAY_CONTAINER_ADDRESS is required'}
-      - NANOBOT_GATEWAY_CONTAINER_PORT=${NANOBOT_GATEWAY_CONTAINER_PORT:?'NANOBOT_GATEWAY_CONTAINER_PORT is required'}
-      - NANOBOT_WEBCHAT_CONTAINER_ADDRESS=${NANOBOT_WEBCHAT_CONTAINER_ADDRESS:?'NANOBOT_WEBCHAT_CONTAINER_ADDRESS is required'}
-      - NANOBOT_WEBCHAT_CONTAINER_PORT=${NANOBOT_WEBCHAT_CONTAINER_PORT:?'NANOBOT_WEBCHAT_CONTAINER_PORT is required'}
-      - NANOBOT_ACCESS_KEY=${NANOBOT_ACCESS_KEY:?'NANOBOT_ACCESS_KEY is required'}
-      - PYTHONPATH=/app/mcp/mcp-lms/src:/app/mcp/mcp-obs/src:/app/nanobot-websocket-channel/mcp-webchat/src
-      - OTEL_SERVICE_NAME=nanobot
-      - OTEL_TRACES_EXPORTER=otlp
-      - OTEL_METRICS_EXPORTER=none
-      - OTEL_LOGS_EXPORTER=otlp
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:${CONST_OTEL_COLLECTOR_GRPC_PORT:?'CONST_OTEL_COLLECTOR_GRPC_PORT is required'}
-      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-      - OTEL_PYTHON_LOG_CORRELATION=true
-    depends_on:
-      - backend
-      - qwen-code-api
-      - otel-collector
-
-  # Task 2B — uncomment after you add nanobot-websocket-channel and want the Flutter build.
-  client-web-flutter:
-    build:
-      context: ./nanobot-websocket-channel/client-web-flutter
-      args:
-        REGISTRY_PREFIX_DOCKER_HUB: ${REGISTRY_PREFIX_DOCKER_HUB:-}
-        REGISTRY_PREFIX_GHCR: ${REGISTRY_PREFIX_GHCR:-}
-    volumes:
-      - client-web-flutter:/output
-
   caddy:
     image: ${REGISTRY_PREFIX_DOCKER_HUB:-}caddy:2.11-alpine
     networks:
@@ -161,19 +100,11 @@ services:
     depends_on:
       - backend
       - client-web-react
-      # Task 2B — uncomment after you enable the Flutter build service above.
-      - client-web-flutter
-      # Task 2A — uncomment after you enable the nanobot service above.
-      - nanobot
-      - qwen-code-api
       - victorialogs
       - victoriatraces
     environment:
       - CADDY_CONTAINER_PORT=${CADDY_CONTAINER_PORT:?'CADDY_CONTAINER_PORT is required'}
       - BACKEND_CONTAINER_PORT=${BACKEND_CONTAINER_PORT:?'BACKEND_CONTAINER_PORT is required'}
-      # Task 2A — uncomment when you proxy /ws/chat to nanobot.
-      - NANOBOT_WEBCHAT_CONTAINER_PORT=${NANOBOT_WEBCHAT_CONTAINER_PORT:?'NANOBOT_WEBCHAT_CONTAINER_PORT is required'}
-      - QWEN_CODE_API_CONTAINER_PORT=${QWEN_CODE_API_CONTAINER_PORT:?'QWEN_CODE_API_CONTAINER_PORT is required'}
       - CONST_PGADMIN_CONTAINER_PORT=${CONST_PGADMIN_CONTAINER_PORT:?'CONST_PGADMIN_CONTAINER_PORT is required'}
       - CONST_VICTORIALOGS_CONTAINER_PORT=${CONST_VICTORIALOGS_CONTAINER_PORT:?'CONST_VICTORIALOGS_CONTAINER_PORT is required'}
       - CONST_VICTORIATRACES_CONTAINER_PORT=${CONST_VICTORIATRACES_CONTAINER_PORT:?'CONST_VICTORIATRACES_CONTAINER_PORT is required'}
@@ -182,57 +113,6 @@ services:
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile
       - client-web-react:/srv/react:ro
-      # Task 2B — uncomment when you want Caddy to serve the Flutter build output.
-      - client-web-flutter:/srv/flutter:ro
-
-  qwen-code-api:
-    build:
-      context: ./qwen-code-api
-      args:
-        REGISTRY_PREFIX_DOCKER_HUB: ${REGISTRY_PREFIX_DOCKER_HUB:-}
-    restart: unless-stopped
-    networks:
-      - lms-network
-    ports:
-      - ${QWEN_CODE_API_HOST_ADDRESS:?'QWEN_CODE_API_HOST_ADDRESS is required'}:${QWEN_CODE_API_HOST_PORT:?'QWEN_CODE_API_HOST_PORT is required'}:${QWEN_CODE_API_CONTAINER_PORT:-8080}
-    volumes:
-      - ~/.qwen:/mnt/qwen-creds:ro
-    environment:
-      - PORT=${QWEN_CODE_API_CONTAINER_PORT:-8080}
-      - ADDRESS=${QWEN_CODE_API_CONTAINER_ADDRESS:-0.0.0.0}
-      - DEFAULT_MODEL=${QWEN_CODE_API_MODEL:?'QWEN_CODE_API_MODEL is required'}
-      - LOG_LEVEL=${QWEN_CODE_API_LOG_LEVEL:?'QWEN_CODE_API_LOG_LEVEL is required'}
-      - MAX_RETRIES=${QWEN_CODE_API_MAX_RETRIES:?'QWEN_CODE_API_MAX_RETRIES is required'}
-      - RETRY_DELAY_MS=${QWEN_CODE_API_RETRY_DELAY_MS:?'QWEN_CODE_API_RETRY_DELAY_MS is required'}
-      - QWEN_CODE_AUTH_USE=${QWEN_CODE_API_AUTH_USE:?'QWEN_CODE_API_AUTH_USE is required'}
-      - LOG_REQUESTS=${QWEN_CODE_API_LOG_REQUESTS:?'QWEN_CODE_API_LOG_REQUESTS is required'}
-      - QWEN_CODE_API_KEY=${QWEN_CODE_API_KEY:-}
-      - OTEL_SERVICE_NAME=Qwen Code API
-      - OTEL_TRACES_EXPORTER=otlp
-      - OTEL_METRICS_EXPORTER=none
-      - OTEL_LOGS_EXPORTER=otlp
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:${CONST_OTEL_COLLECTOR_GRPC_PORT:?'CONST_OTEL_COLLECTOR_GRPC_PORT is required'}
-      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-      - OTEL_PYTHON_LOG_CORRELATION=true
-    depends_on:
-      otel-collector:
-        condition: service_started
-    healthcheck:
-      test:
-        - CMD
-        - python
-        - "-c"
-        - |
-          import urllib.request
-          req = urllib.request.Request(
-              'http://localhost:${QWEN_CODE_API_CONTAINER_PORT:-8080}/health',
-              headers={'X-API-Key': '${QWEN_CODE_API_KEY:-}'}
-          )
-          urllib.request.urlopen(req)
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
   # Optional Task 1 — uncomment after you add the Telegram client repo in Task 2.
   # client-telegram-bot:
@@ -301,7 +181,6 @@ services:
 volumes:
   postgres_data:
   client-web-react:
-  client-web-flutter:
   victorialogs_data:
   victoriatraces_data:
 

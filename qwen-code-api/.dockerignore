@@ -1,5 +1,0 @@
-__pycache__/
-*.pyc
-.dockerignore
-Dockerfile
-*.md

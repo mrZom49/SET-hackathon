@@ -26,5 +26,7 @@ class Settings(BaseSettings):
     db_user: str = Field(..., alias="DB_USER")
     db_password: str = Field(..., alias="DB_PASSWORD")
 
+    jwt_secret: str = Field(..., alias="JWT_SECRET")
+
 
 settings = Settings.model_validate({})
