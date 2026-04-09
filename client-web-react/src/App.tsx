@@ -1,7 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react'
 import './App.css'
 
-const STORAGE_KEY = 'api_key'
+const STORAGE_KEY = 'auth_token'
 
 type Page = 'dashboard' | 'flashcards'
 
@@ -23,68 +23,13 @@ function App() {
   const [token, setToken] = useState(
     () => localStorage.getItem(STORAGE_KEY) ?? '',
   )
-  const [draft, setDraft] = useState('')
-  const [selectedRole, setSelectedRole] = useState<'viewer' | 'editor'>('viewer')
   const [page, setPage] = useState<Page>('dashboard')
-  const [role, setRole] = useState<'viewer' | 'editor'>(() => {
-    const savedRole = localStorage.getItem('user_role')
-    return (savedRole as 'viewer' | 'editor') || 'viewer'
-  })
-
-  function handleConnect(e: FormEvent) {
-    e.preventDefault()
-    const trimmed = draft.trim()
-    if (!trimmed) return
-    localStorage.setItem(STORAGE_KEY, trimmed)
-    localStorage.setItem('user_role', selectedRole)
-    setToken(trimmed)
-    setRole(selectedRole)
-  }
-
-  function handleDisconnect() {
-    localStorage.removeItem(STORAGE_KEY)
-    localStorage.removeItem('user_role')
-    setToken('')
-    setDraft('')
-    setRole('viewer')
-  }
 
   if (!token) {
-    return (
-      <form className="token-form" onSubmit={handleConnect}>
-        <h1>LMS API Key</h1>
-        <p>Enter your LMS API key to connect.</p>
-        <input
-          type="password"
-          placeholder="Token"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-        />
-        <div className="role-select">
-          <label>
-            <input
-              type="radio"
-              name="role"
-              value="viewer"
-              checked={selectedRole === 'viewer'}
-              onChange={() => setSelectedRole('viewer')}
-            />
-            Viewer
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="role"
-              value="editor"
-              checked={selectedRole === 'editor'}
-              onChange={() => setSelectedRole('editor')}
-            />
-            Editor
-          </label>
-        </div>
-        <button type="submit">Connect</button>
-      </form>
-    )
+    return <AuthPage onLogin={(t) => {
+      localStorage.setItem(STORAGE_KEY, t)
+      setToken(t)
+    }} />
   }
 
   return (
@@ -105,20 +50,85 @@ function App() {
           </button>
         </nav>
         <div className="user-info">
-          <span className="user-role">{role}</span>
-          <button className="btn-disconnect" onClick={handleDisconnect}>
-            Disconnect
+          <button className="btn-disconnect" onClick={() => {
+            localStorage.removeItem(STORAGE_KEY)
+            setToken('')
+          }}>
+            Logout
           </button>
         </div>
       </header>
 
-      {page === 'dashboard' && <DashboardPage token={token} role={role} />}
-      {page === 'flashcards' && <FlashcardsPage token={token} role={role} />}
+      {page === 'dashboard' && <DashboardPage token={token} />}
+      {page === 'flashcards' && <FlashcardsPage token={token} />}
     </div>
   )
 }
 
-function DashboardPage({ token, role }: { token: string; role: 'viewer' | 'editor' }) {
+function AuthPage({ onLogin }: { onLogin: (token: string) => void }) {
+  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const endpoint = mode === 'login' ? '/auth/login' : '/auth/register'
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.detail || 'Authentication failed')
+      }
+      const data = await res.json()
+      onLogin(data.access_token)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form className="token-form" onSubmit={handleSubmit}>
+      <h1>{mode === 'login' ? 'Login' : 'Register'}</h1>
+      <p>Enter your credentials to access flashcards.</p>
+      <input
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
+      />
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        required
+      />
+      {error && <p className="error">{error}</p>}
+      <button type="submit" disabled={loading}>
+        {loading ? 'Loading...' : mode === 'login' ? 'Login' : 'Register'}
+      </button>
+      <p className="switch-mode">
+        {mode === 'login' ? "Don't have an account? " : "Already have an account? "}
+        <button type="button" className="link-btn" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
+          {mode === 'login' ? 'Register' : 'Login'}
+        </button>
+      </p>
+    </form>
+  )
+}
+
+function DashboardPage({ token }: { token: string }) {
   const [decks, setDecks] = useState<Deck[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -130,10 +140,14 @@ function DashboardPage({ token, role }: { token: string; role: 'viewer' | 'edito
       const res = await fetch('/flashcards/decks', {
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `HTTP ${res.status}`)
+      }
       const data: Deck[] = await res.json()
       setDecks(data)
     } catch (err) {
+      console.error('Load decks error:', err)
       setError((err as Error).message)
     } finally {
       setLoading(false)
@@ -161,7 +175,7 @@ function DashboardPage({ token, role }: { token: string; role: 'viewer' | 'edito
   )
 }
 
-function FlashcardsPage({ token, role }: { token: string; role: 'viewer' | 'editor' }) {
+function FlashcardsPage({ token }: { token: string }) {
   const [decks, setDecks] = useState<Deck[]>([])
   const [selectedDeck, setSelectedDeck] = useState<Deck | null>(null)
   const [cards, setCards] = useState<Card[]>([])
@@ -183,10 +197,14 @@ function FlashcardsPage({ token, role }: { token: string; role: 'viewer' | 'edit
       const res = await fetch('/flashcards/decks', {
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `HTTP ${res.status}`)
+      }
       const data: Deck[] = await res.json()
       setDecks(data)
     } catch (err) {
+      console.error('Load decks error:', err)
       setError((err as Error).message)
     } finally {
       setLoading(false)
@@ -200,10 +218,14 @@ function FlashcardsPage({ token, role }: { token: string; role: 'viewer' | 'edit
       const res = await fetch(`/flashcards/decks/${deckId}/cards`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `HTTP ${res.status}`)
+      }
       const data: Card[] = await res.json()
       setCards(data)
     } catch (err) {
+      console.error('Load cards error:', err)
       setError((err as Error).message)
     } finally {
       setLoading(false)
@@ -226,10 +248,14 @@ function FlashcardsPage({ token, role }: { token: string; role: 'viewer' | 'edit
         },
         body: JSON.stringify({ name: newDeckName }),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `HTTP ${res.status}`)
+      }
       setNewDeckName('')
       loadDecks()
     } catch (err) {
+      console.error('Create deck error:', err)
       setError((err as Error).message)
     }
   }
@@ -246,11 +272,57 @@ function FlashcardsPage({ token, role }: { token: string; role: 'viewer' | 'edit
         },
         body: JSON.stringify({ question: newQuestion, answer: newAnswer }),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `HTTP ${res.status}`)
+      }
       setNewQuestion('')
       setNewAnswer('')
       loadCards(selectedDeck.id)
     } catch (err) {
+      console.error('Create card error:', err)
+      setError((err as Error).message)
+    }
+  }
+
+  const deleteDeck = async (deckId: number) => {
+    try {
+      const res = await fetch(`/flashcards/decks/${deckId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `HTTP ${res.status}`)
+      }
+      if (selectedDeck?.id === deckId) setSelectedDeck(null)
+      loadDecks()
+    } catch (err) {
+      console.error('Delete deck error:', err)
+      setError((err as Error).message)
+    }
+  }
+
+  const updateDeck = async (deckId: number, newName: string) => {
+    try {
+      const res = await fetch(`/flashcards/decks/${deckId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: newName }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `HTTP ${res.status}`)
+      }
+      loadDecks()
+      if (selectedDeck?.id === deckId) {
+        setSelectedDeck({ ...selectedDeck, name: newName })
+      }
+    } catch (err) {
+      console.error('Update deck error:', err)
       setError((err as Error).message)
     }
   }
@@ -263,7 +335,7 @@ function FlashcardsPage({ token, role }: { token: string; role: 'viewer' | 'edit
     setShowStudy(true)
   }
 
-  const gradeCard = (_know: boolean) => {
+  const gradeCard = () => {
     setIsResetting(true)
     setIsFlipped(false)
     setTimeout(() => {
@@ -298,10 +370,10 @@ function FlashcardsPage({ token, role }: { token: string; role: 'viewer' | 'edit
           </div>
           {isFlipped && (
             <div className="grade-buttons">
-              <button className="btn-know" onClick={() => gradeCard(true)}>
+              <button className="btn-know" onClick={gradeCard}>
                 Know
               </button>
-              <button className="btn-dont-know" onClick={() => gradeCard(false)}>
+              <button className="btn-dont-know" onClick={gradeCard}>
                 Don't Know
               </button>
             </div>
@@ -323,17 +395,15 @@ function FlashcardsPage({ token, role }: { token: string; role: 'viewer' | 'edit
       {!selectedDeck ? (
         <div className="decks-section">
           <h2>Your Decks</h2>
-          {role === 'editor' && (
-            <form onSubmit={createDeck} className="create-form">
-              <input
-                type="text"
-                placeholder="Deck name"
-                value={newDeckName}
-                onChange={(e) => setNewDeckName(e.target.value)}
-              />
-              <button type="submit">Create Deck</button>
-            </form>
-          )}
+          <form onSubmit={createDeck} className="create-form">
+            <input
+              type="text"
+              placeholder="Deck name"
+              value={newDeckName}
+              onChange={(e) => setNewDeckName(e.target.value)}
+            />
+            <button type="submit">Create Deck</button>
+          </form>
           <div className="deck-list">
             {decks.map((deck) => (
               <div
@@ -346,6 +416,31 @@ function FlashcardsPage({ token, role }: { token: string; role: 'viewer' | 'edit
               >
                 <h3>{deck.name}</h3>
                 <p>Created: {new Date(deck.created_at).toLocaleDateString()}</p>
+                <div className="deck-actions">
+                  <button
+                    className="btn-edit"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const newName = prompt('Enter new deck name:', deck.name)
+                      if (newName && newName !== deck.name) {
+                        updateDeck(deck.id, newName)
+                      }
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="btn-delete"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (confirm('Delete this deck and all its cards?')) {
+                        deleteDeck(deck.id)
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -356,23 +451,21 @@ function FlashcardsPage({ token, role }: { token: string; role: 'viewer' | 'edit
             Back to Decks
           </button>
           <h2>{selectedDeck.name}</h2>
-          {role === 'editor' && (
-            <form onSubmit={createCard} className="create-form">
-              <input
-                type="text"
-                placeholder="Question"
-                value={newQuestion}
-                onChange={(e) => setNewQuestion(e.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="Answer"
-                value={newAnswer}
-                onChange={(e) => setNewAnswer(e.target.value)}
-              />
-              <button type="submit">Add Card</button>
-            </form>
-          )}
+          <form onSubmit={createCard} className="create-form">
+            <input
+              type="text"
+              placeholder="Question"
+              value={newQuestion}
+              onChange={(e) => setNewQuestion(e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="Answer"
+              value={newAnswer}
+              onChange={(e) => setNewAnswer(e.target.value)}
+            />
+            <button type="submit">Add Card</button>
+          </form>
           <button
             className="btn-study"
             onClick={startStudy}

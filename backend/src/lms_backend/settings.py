@@ -9,8 +9,6 @@ class Settings(BaseSettings):
     port: int = Field(..., alias="PORT")
     reload: bool = Field(..., alias="RELOAD")
 
-    api_key: str = Field(..., alias="LMS_API_KEY")
-
     cors_origins: list[str] = Field(..., alias="CORS_ORIGINS")
 
     enable_interactions: bool = Field(..., alias="BACKEND_ENABLE_INTERACTIONS")

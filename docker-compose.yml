@@ -21,7 +21,6 @@ services:
       - UVICORN_PORT=${BACKEND_CONTAINER_PORT:?'BACKEND_CONTAINER_PORT is required'}
       - UVICORN_RELOAD=${BACKEND_RELOAD:?'BACKEND_RELOAD is required'}
       - CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-[]}
-      - LMS_API_KEY=${LMS_API_KEY:?'LMS_API_KEY is required'}
       - BACKEND_ENABLE_INTERACTIONS=${BACKEND_ENABLE_INTERACTIONS:?'BACKEND_ENABLE_INTERACTIONS is required'}
       - BACKEND_ENABLE_LEARNERS=${BACKEND_ENABLE_LEARNERS:?'BACKEND_ENABLE_LEARNERS is required'}
       - AUTOCHECKER_API_URL=${AUTOCHECKER_API_URL:?'AUTOCHECKER_API_URL is required'}
@@ -33,18 +32,9 @@ services:
       - DB_USER=${POSTGRES_USER:?'POSTGRES_USER is required'}
       - DB_PASSWORD=${POSTGRES_PASSWORD:?'POSTGRES_PASSWORD is required'}
       - JWT_SECRET=${JWT_SECRET:?'JWT_SECRET is required'}
-      - OTEL_SERVICE_NAME=${BACKEND_NAME:?'BACKEND_NAME is required'}
-      - OTEL_TRACES_EXPORTER=otlp
-      - OTEL_METRICS_EXPORTER=none
-      - OTEL_LOGS_EXPORTER=otlp
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:${CONST_OTEL_COLLECTOR_GRPC_PORT:?'CONST_OTEL_COLLECTOR_GRPC_PORT is required'}
-      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-      - OTEL_PYTHON_LOG_CORRELATION=true
     depends_on:
       postgres:
         condition: service_healthy
-      otel-collector:
-        condition: service_started
 
   postgres:
     image: ${REGISTRY_PREFIX_DOCKER_HUB:-}postgres:18.3-alpine
@@ -100,16 +90,8 @@ services:
     depends_on:
       - backend
       - client-web-react
-      - victorialogs
-      - victoriatraces
-    environment:
-      - CADDY_CONTAINER_PORT=${CADDY_CONTAINER_PORT:?'CADDY_CONTAINER_PORT is required'}
-      - BACKEND_CONTAINER_PORT=${BACKEND_CONTAINER_PORT:?'BACKEND_CONTAINER_PORT is required'}
-      - CONST_PGADMIN_CONTAINER_PORT=${CONST_PGADMIN_CONTAINER_PORT:?'CONST_PGADMIN_CONTAINER_PORT is required'}
-      - CONST_VICTORIALOGS_CONTAINER_PORT=${CONST_VICTORIALOGS_CONTAINER_PORT:?'CONST_VICTORIALOGS_CONTAINER_PORT is required'}
-      - CONST_VICTORIATRACES_CONTAINER_PORT=${CONST_VICTORIATRACES_CONTAINER_PORT:?'CONST_VICTORIATRACES_CONTAINER_PORT is required'}
     ports:
-      - ${GATEWAY_HOST_ADDRESS:?'GATEWAY_HOST_ADDRESS is required'}:${GATEWAY_HOST_PORT:?'GATEWAY_HOST_PORT is required'}:${CADDY_CONTAINER_PORT}
+      - ${GATEWAY_HOST_ADDRESS:-0.0.0.0}:${GATEWAY_HOST_PORT:-42002}:80
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile
       - client-web-react:/srv/react:ro
@@ -141,48 +123,9 @@ services:
   #     - nanobot
   #     - otel-collector
 
-  victorialogs:
-    image: ${REGISTRY_PREFIX_DOCKER_HUB:-}victoriametrics/victoria-logs:latest
-    restart: unless-stopped
-    networks:
-      - lms-network
-    ports:
-      - ${VICTORIALOGS_HOST_ADDRESS:?'VICTORIALOGS_HOST_ADDRESS is required'}:${VICTORIALOGS_HOST_PORT:?'VICTORIALOGS_HOST_PORT is required'}:${CONST_VICTORIALOGS_CONTAINER_PORT:?'CONST_VICTORIALOGS_CONTAINER_PORT is required'}
-    volumes:
-      - victorialogs_data:/victoria-logs-data
-    command:
-      - -storageDataPath=/victoria-logs-data
-      - -retentionPeriod=7d
-
-  victoriatraces:
-    image: ${REGISTRY_PREFIX_DOCKER_HUB:-}victoriametrics/victoria-traces:latest
-    restart: unless-stopped
-    networks:
-      - lms-network
-    ports:
-      - ${VICTORIATRACES_HOST_ADDRESS:?'VICTORIATRACES_HOST_ADDRESS is required'}:${VICTORIATRACES_HOST_PORT:?'VICTORIATRACES_HOST_PORT is required'}:${CONST_VICTORIATRACES_CONTAINER_PORT:?'CONST_VICTORIATRACES_CONTAINER_PORT is required'}
-    volumes:
-      - victoriatraces_data:/victoria-traces-data
-    command:
-      - -storageDataPath=/victoria-traces-data
-      - -retentionPeriod=7d
-
-  otel-collector:
-    image: ${REGISTRY_PREFIX_DOCKER_HUB:-}otel/opentelemetry-collector-contrib:latest
-    restart: unless-stopped
-    networks:
-      - lms-network
-    volumes:
-      - ./otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml
-    depends_on:
-      - victorialogs
-      - victoriatraces
-
 volumes:
   postgres_data:
   client-web-react:
-  victorialogs_data:
-  victoriatraces_data:
 
 networks:
   lms-network:

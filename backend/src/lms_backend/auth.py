@@ -1,4 +1,4 @@
-"""API key authentication dependency."""
+"""JWT-based authentication for users."""
 
 import logging
 from datetime import datetime, timedelta, timezone
@@ -22,28 +22,10 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
 
-def verify_api_key(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> str:
-    """Verify the API key from the Authorization header.
-
-    Expects: Authorization: Bearer <API_KEY>
-    Returns the key string if valid.
-    Raises 401 if invalid.
-    """
-    if credentials.credentials != settings.api_key:
-        logger.warning("auth_failure", extra={"event": "auth_failure"})
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API key",
-        )
-    logger.info("auth_success", extra={"event": "auth_success"})
-    return credentials.credentials
-
-
 def create_access_token(data: dict[str, int]) -> str:
     """Create a JWT access token."""
-    to_encode: dict[str, int | datetime] = data.copy()
+    user_id = data["sub"]
+    to_encode: dict[str, str | datetime] = {"sub": str(user_id)}
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.jwt_secret, algorithm=ALGORITHM)
@@ -59,18 +41,27 @@ async def get_current_user(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
     )
+    token = ""
     try:
         token = credentials.credentials
+        print(
+            f"DEBUG: token_received, prefix: {token[:20] if token else 'none'}, length: {len(token) if token else 0}"
+        )
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
-        user_id: int | None = payload.get("sub")
-        if user_id is None:
+        user_id_str: str | None = payload.get("sub")
+        if user_id_str is None:
+            print("DEBUG: token_no_user_id")
             raise credentials_exception
-    except JWTError:
+        user_id = int(user_id_str)
+        print(f"DEBUG: token_valid, user_id: {user_id}")
+    except JWTError as e:
+        print(f"DEBUG: token_decode_error: {e}")
         raise credentials_exception
 
     result = await session.exec(select(User).where(User.id == user_id))
     user = result.one_or_none()
     if user is None:
+        print(f"DEBUG: user_not_found, user_id: {user_id}")
         raise credentials_exception
     return user
 

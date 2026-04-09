@@ -5,13 +5,12 @@ import time
 import traceback
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
-from lms_backend.auth import verify_api_key
 from lms_backend.routers import (
     analytics,
     auth,
@@ -95,7 +94,7 @@ async def log_requests(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -104,14 +103,12 @@ app.include_router(
     items.router,
     prefix="/items",
     tags=["items"],
-    dependencies=[Depends(verify_api_key)],
 )
 
 app.include_router(
     flashcards.router,
     prefix="/flashcards",
     tags=["flashcards"],
-    dependencies=[Depends(verify_api_key)],
 )
 
 app.include_router(
@@ -125,7 +122,6 @@ if settings.enable_interactions:
         interactions.router,
         prefix="/interactions",
         tags=["interactions"],
-        dependencies=[Depends(verify_api_key)],
     )
 
 if settings.enable_learners:
@@ -133,19 +129,16 @@ if settings.enable_learners:
         learners.router,
         prefix="/learners",
         tags=["learners"],
-        dependencies=[Depends(verify_api_key)],
     )
 
 app.include_router(
     pipeline.router,
     prefix="/pipeline",
     tags=["pipeline"],
-    dependencies=[Depends(verify_api_key)],
 )
 
 app.include_router(
     analytics.router,
     prefix="/analytics",
     tags=["analytics"],
-    dependencies=[Depends(verify_api_key)],
 )

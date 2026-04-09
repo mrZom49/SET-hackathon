@@ -50,8 +50,20 @@ async def login(body: UserCreate, session: AsyncSession = Depends(get_session)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
+    if user.id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User ID not found",
+        )
     access_token = create_access_token(data={"sub": user.id})
-    logger.info("user_logged_in", extra={"event": "user_logged_in", "user_id": user.id})
+    logger.info(
+        "user_logged_in",
+        extra={
+            "event": "user_logged_in",
+            "user_id": user.id,
+            "token_prefix": access_token[:20],
+        },
+    )
     return Token(access_token=access_token, token_type="bearer")
 
 

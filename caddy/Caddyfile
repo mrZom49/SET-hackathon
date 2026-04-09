@@ -1,13 +1,13 @@
 # See wiki/caddy.md
 
-:{$CADDY_CONTAINER_PORT} {
+:80 {
     @public-utils-denied {
-        path /utils/pgadmin* /utils/victorialogs* /utils/victoriatraces*
+        path /utils/pgadmin*
         not remote_ip private_ranges
     }
     @unknown-utils {
         path /utils/*
-        not path /utils/pgadmin* /utils/victorialogs* /utils/victoriatraces*
+        not path /utils/pgadmin*
     }
 
     # Keep admin and observability UIs reachable only from localhost/private networks.
@@ -16,46 +16,35 @@
     respond @unknown-utils "Not Found" 404
 
     handle /items* {
-        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+        reverse_proxy http://backend:8000
     }
     handle /flashcards* {
-        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+        reverse_proxy http://backend:8000
     }
     handle /auth* {
-        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+        reverse_proxy http://backend:8000
     }
     handle /learners* {
-        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+        reverse_proxy http://backend:8000
     }
     handle /interactions* {
-        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+        reverse_proxy http://backend:8000
     }
     handle /pipeline* {
-        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+        reverse_proxy http://backend:8000
     }
     handle /analytics* {
-        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+        reverse_proxy http://backend:8000
     }
-    # Task 2A — uncomment once the nanobot service is running behind Caddy.
-    # handle /ws/chat {
-    #     reverse_proxy http://nanobot:{$NANOBOT_WEBCHAT_CONTAINER_PORT}
-    # }
     handle /utils/pgadmin* {
-        reverse_proxy http://pgadmin:{$CONST_PGADMIN_CONTAINER_PORT}
-    }
-    handle_path /utils/victorialogs* {
-        reverse_proxy http://victorialogs:{$CONST_VICTORIALOGS_CONTAINER_PORT}
-    }
-    handle_path /utils/victoriatraces* {
-        reverse_proxy http://victoriatraces:{$CONST_VICTORIATRACES_CONTAINER_PORT}
+        reverse_proxy http://pgadmin:80
     }
     handle /docs* {
-        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+        reverse_proxy http://backend:8000
     }
     handle /openapi.json {
-        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+        reverse_proxy http://backend:8000
     }
-    # Task 2B — uncomment once the Flutter build output is mounted at /srv/flutter.
     handle_path /flutter* {
         root * /srv/flutter
         try_files {path} /index.html

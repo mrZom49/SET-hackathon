@@ -28,7 +28,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY . /app/backend
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --package lms-backend
+    uv sync --frozen --package lms-backend --verbose
 
 # ---
 # Stage 2: use a final image without uv
